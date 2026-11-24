@@ -140,21 +140,28 @@ def baue_nachricht(daten: dict, jetzt: datetime) -> str:
 
 def sende_telegram(text: str) -> None:
     token = os.environ["TELEGRAM_BOT_TOKEN"].strip()
-    chat_id = os.environ["TELEGRAM_CHAT_ID"].strip()
-    body = urllib.parse.urlencode(
-        {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-    ).encode()
-    req = urllib.request.Request(
-        f"https://api.telegram.org/bot{token}/sendMessage", data=body, method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            antwort = json.load(resp)
-    except urllib.error.HTTPError as err:
-        # Den Token nicht ausgeben – nur die Antwort von Telegram.
-        raise SystemExit(f"Telegram-Fehler {err.code}: {err.read().decode(errors='replace')}")
-    if not antwort.get("ok"):
-        raise SystemExit(f"Telegram-Fehler: {antwort}")
+    # Mehrere Empfänger: Chat-IDs mit Komma trennen, z. B. "123456789,987654321"
+    chat_ids = [c.strip() for c in os.environ["TELEGRAM_CHAT_ID"].split(",") if c.strip()]
+    fehler = []
+    for chat_id in chat_ids:
+        body = urllib.parse.urlencode(
+            {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        ).encode()
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/sendMessage", data=body, method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                antwort = json.load(resp)
+            if not antwort.get("ok"):
+                fehler.append(f"Chat {chat_id}: {antwort}")
+        except urllib.error.HTTPError as err:
+            # Den Token nicht ausgeben – nur die Antwort von Telegram.
+            fehler.append(f"Chat {chat_id}: Fehler {err.code}: {err.read().decode(errors='replace')}")
+    # Erst alle Empfänger versuchen, dann Fehler melden – so bekommt einer die
+    # Nachricht auch dann, wenn die Chat-ID des anderen falsch ist.
+    if fehler:
+        raise SystemExit("Telegram-Fehler:\n" + "\n".join(fehler))
 
 
 def main() -> int:
