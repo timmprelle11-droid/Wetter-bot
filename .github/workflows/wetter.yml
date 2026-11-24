@@ -1,1 +1,27 @@
 
+name: Wetter
+
+on:
+  schedule:
+    # GitHub rechnet in UTC. 4:00 UTC = 6:00 Uhr Sommerzeit,
+    # 5:00 UTC = 6:00 Uhr Winterzeit. Das Skript sendet nur einmal,
+    # nämlich wenn es in Deutschland gerade 6 Uhr ist.
+    - cron: "0 4 * * *"
+    - cron: "0 5 * * *"
+  # Erlaubt den manuellen Start über den Tab "Actions" → "Run workflow"
+  workflow_dispatch:
+
+jobs:
+  senden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wetter senden
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Beim manuellen Start immer senden, sonst nur um 6 Uhr deutscher Zeit
+          NUR_UM_STUNDE: ${{ github.event_name == 'schedule' && '6' || '' }}
+        run: python3 wetter.py
